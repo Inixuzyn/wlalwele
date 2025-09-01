@@ -1,0 +1,408 @@
+-- =========================================
+-- 🎣 FISH IT SCRIPT + NEW FEATURES
+-- Author: @HyRexxyy
+-- Update: 2025-09-01 (5 new features added)
+-- =========================================
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+
+-- 🔗 Load Rayfield
+local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua"))()
+
+-- 🪟 Main Window
+local Window = Rayfield:CreateWindow({
+    Name = "Fish It Script",
+    LoadingTitle = "Fish It",
+    LoadingSubtitle = "by @HyRexxyy",
+    Theme = "Amethyst",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "Rexxyy",
+        FileName = "FishIt"
+    },
+    KeySystem = false
+})
+
+-- 🗂️ Tabs
+local DevTab = Window:CreateTab("Developer", "airplay")
+local MainTab = Window:CreateTab("Auto Fish", "fish")
+local PlayerTab = Window:CreateTab("Player", "users-round")
+local IslandsTab = Window:CreateTab("Islands", "map")
+local SettingsTab = Window:CreateTab("Settings", "cog")
+local NPCTab = Window:CreateTab("NPC", "user")
+local EventTab = Window:CreateTab("Event", "cog")
+local Spawn_Boat = Window:CreateTab("Spawn Boat", "cog")
+local Buy_Rod = Window:CreateTab("Buy Rod", "cog")
+local Buy_Weather = Window:CreateTab("Buy Weather", "cog")
+local Buy_Baits = Window:CreateTab("Buy Bait", "cog")
+local RaidTab = Window:CreateTab("Boss Raids", "sword") -- ✅ NEW TAB
+
+-- 🔗 Remotes
+local net = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
+local rodRemote = net:WaitForChild("RF/ChargeFishingRod")
+local miniGameRemote = net:WaitForChild("RF/RequestFishingMinigameStarted")
+local finishRemote = net:WaitForChild("RE/FishingCompleted")
+local equipRemote = net:WaitForChild("RE/EquipToolFromHotbar")
+
+-- 🧠 State
+local autofish = false
+local perfectCast = false
+local autoRecastDelay = 0.5
+local enchantPos = Vector3.new(3231, -1303, 1402)
+
+-- 🎣 Auto Fish
+MainTab:CreateToggle({
+    Name = "🎣 Enable Auto Fishing",
+    CurrentValue = false,
+    Callback = function(val)
+        autofish = val
+        if val then
+            task.spawn(function()
+                while autofish do
+                    pcall(function()
+                        equipRemote:FireServer(1)
+                        task.wait(0.1)
+                        local timestamp = perfectCast and 9999999999 or (tick() + math.random())
+                        rodRemote:InvokeServer(timestamp)
+                        task.wait(0.1)
+                        local x = perfectCast and -1.238 or (math.random(-1000, 1000) / 1000)
+                        local y = perfectCast and 0.969 or (math.random(0, 1000) / 1000)
+                        miniGameRemote:InvokeServer(x, y)
+                        task.wait(1.3)
+                        finishRemote:FireServer()
+                    end)
+                    task.wait(autoRecastDelay)
+                end
+            end)
+        end
+    end
+})
+
+MainTab:CreateToggle({
+    Name = "✨ Use Perfect Cast",
+    CurrentValue = false,
+    Callback = function(val)
+        perfectCast = val
+    end
+})
+
+MainTab:CreateSlider({
+    Name = "⏱️ Auto Recast Delay (seconds)",
+    Range = {0.5, 5},
+    Increment = 0.1,
+    CurrentValue = autoRecastDelay,
+    Callback = function(val)
+        autoRecastDelay = val
+    end
+})
+
+-- ✅ NEW: Smart-Sell Filter
+local minPriceToSell = 0
+MainTab:CreateSlider({
+    Name = "💰 Min Price to Auto-Sell",
+    Range = {0, 1000000},
+    Increment = 1000,
+    CurrentValue = 0,
+    Callback = function(val)
+        minPriceToSell = val
+    end
+})
+
+-- ✅ NEW: Fast-Catch Aura
+local fastCatch = false
+MainTab:CreateToggle({
+    Name = "⚡ Fast-Catch Aura (no minigame)",
+    CurrentValue = false,
+    Callback = function(v)
+        fastCatch = v
+        if v then
+            hookfunction(require(ReplicatedStorage.Shared.FishingRodModifiers).Invoke, function(...)
+                return true
+            end)
+        end
+    end
+})
+
+-- 🚤 Spawn Boat
+Spawn_Boat:CreateParagraph({ Title = "🚤 Standard Boats", Content = "Spawn a boat" })
+local standard_boats = {
+    { Name = "Small Boat", ID = 1 },
+    { Name = "Kayak", ID = 2 },
+    { Name = "Jetski", ID = 3 },
+    { Name = "Highfield Boat", ID = 4 },
+    { Name = "Speed Boat", ID = 5 },
+    { Name = "Fishing Boat", ID = 6 },
+    { Name = "Mini Yacht", ID = 14 },
+    { Name = "Hyper Boat", ID = 7 },
+    { Name = "Frozen Boat", ID = 11 },
+    { Name = "Cruiser Boat", ID = 13 }
+}
+for _, boat in ipairs(standard_boats) do
+    Spawn_Boat:CreateButton({
+        Name = "🛥️ " .. boat.Name,
+        Callback = function()
+            pcall(function()
+                net["RF/DespawnBoat"]:InvokeServer()
+                task.wait(3)
+                net["RF/SpawnBoat"]:InvokeServer(boat.ID)
+            end)
+        end
+    })
+end
+
+-- 🎣 Buy Rod
+Buy_Rod:CreateParagraph({ Title = "🎣 Purchase Rods", Content = "Select a rod to buy using coins." })
+local rods = {
+    { Name = "Luck Rod", ID = 79 },
+    { Name = "Carbon Rod", ID = 76 },
+    { Name = "Grass Rod", ID = 85 },
+    { Name = "Demascus Rod", ID = 77 },
+    { Name = "Ice Rod", ID = 78 },
+    { Name = "Lucky Rod", ID = 4 },
+    { Name = "Midnight Rod", ID = 80 },
+    { Name = "Steampunk Rod", ID = 6 },
+    { Name = "Chrome Rod", ID = 7 },
+    { Name = "Astral Rod", ID = 5 }
+}
+for _, rod in ipairs(rods) do
+    Buy_Rod:CreateButton({
+        Name = rod.Name,
+        Callback = function()
+            pcall(function() net["RF/PurchaseFishingRod"]:InvokeServer(rod.ID) end)
+        end
+    })
+end
+
+-- ✅ NEW: Auto-Enchant Rod
+Buy_Rod:CreateSection("✨ Auto Enchant (to Enchant Table)")
+local enchantRunning = false
+Buy_Rod:CreateToggle({
+    Name = "Auto-Enchant Current Rod",
+    CurrentValue = false,
+    Flag = "AutoEnchantToggle",
+    Callback = function(v)
+        enchantRunning = v
+        if v then
+            task.spawn(function()
+                while enchantRunning do
+                    pcall(function()
+                        local char = LocalPlayer.Character
+                        if char and char:FindFirstChild("HumanoidRootPart") then
+                            char.HumanoidRootPart.CFrame = CFrame.new(enchantPos)
+                            task.wait(.5)
+                            net["RF/EnchantFishingRod"]:InvokeServer()
+                            task.wait(5)
+                        end
+                    end)
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+
+-- 🌦️ Buy Weather
+Buy_Weather:CreateParagraph({ Title = "🌤️ Purchase Weather Events", Content = "Select a weather event to trigger." })
+local weathers = {
+    { Name = "Wind", Price = "10k Coins" },
+    { Name = "Snow", Price = "15k Coins" },
+    { Name = "Cloudy", Price = "20k Coins" },
+    { Name = "Storm", Price = "35k Coins" },
+    { Name = "Shark Hunt", Price = "300k Coins" }
+}
+for _, w in ipairs(weathers) do
+    Buy_Weather:CreateButton({
+        Name = w.Name .. " (" .. w.Price .. ")",
+        Callback = function()
+            pcall(function() net["RF/PurchaseWeatherEvent"]:InvokeServer(w.Name) end)
+        end
+    })
+end
+
+-- ✅ NEW: Auto-Refill Bait
+Buy_Baits:CreateSection("🔄 Auto-Refill")
+local autoRefillBait = false
+Buy_Baits:CreateToggle({
+    Name = "Auto-Refill Corrupt Bait (1M+ coins)",
+    CurrentValue = false,
+    Flag = "AutoRefillBait",
+    Callback = function(v)
+        autoRefillBait = v
+        if v then
+            task.spawn(function()
+                while autoRefillBait do
+                    pcall(function()
+                        net["RF/PurchaseBait"]:InvokeServer(15) -- Corrupt Bait
+                    end)
+                    task.wait(10)
+                end
+            end)
+        end
+    end
+})
+
+-- 🪱 Buy Bait
+Buy_Baits:CreateParagraph({ Title = "🪱 Purchase Baits", Content = "Buy bait to enhance fishing luck or effects." })
+local baits = {
+    { Name = "Topwater Bait", ID = 10 },
+    { Name = "Luck Bait", ID = 2 },
+    { Name = "Midnight Bait", ID = 3 },
+    { Name = "Chroma Bait", ID = 6 },
+    { Name = "Dark Mater Bait", ID = 8 },
+    { Name = "Corrupt Bait", ID = 15 }
+}
+for _, bait in ipairs(baits) do
+    Buy_Baits:CreateButton({
+        Name = bait.Name,
+        Callback = function()
+            pcall(function() net["RF/PurchaseBait"]:InvokeServer(bait.ID) end)
+        end
+    })
+end
+
+-- 🌌 Boss Raids Tab
+RaidTab:CreateParagraph({Title = "🐉 Raid Helpers", Content = "One-click utilities for boss raids"})
+
+local bosses = {
+    {Name = "Abyssal Kraken", Pos = Vector3.new(3500, -1250, 1800)},
+    {Name = "Phantom Leviathan", Pos = Vector3.new(-2500, -300, 4000)},
+    {Name = "Storm Serpent", Pos = Vector3.new(0, -800, 6000)}
+}
+
+for _, b in ipairs(bosses) do
+    RaidTab:CreateButton({
+        Name = "Teleport to "..b.Name,
+        Callback = function()
+            local char = Workspace.Characters:FindFirstChild(LocalPlayer.Name)
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                char.HumanoidRootPart.CFrame = CFrame.new(b.Pos + Vector3.new(0,20,0))
+            end
+        end
+    })
+end
+
+RaidTab:CreateToggle({
+    Name = "Auto-Dodge Boss Attacks",
+    CurrentValue = false,
+    Callback = function(v)
+        if v then
+            local dodgeCon
+            dodgeCon = RunService.Heartbeat:Connect(function()
+                local boss = Workspace:FindFirstChild("BossMonster")
+                if boss and boss:FindFirstChild("HumanoidRootPart") then
+                    local char = LocalPlayer.Character
+                    if char and char:FindFirstChild("HumanoidRootPart") then
+                        local dist = (boss.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Magnitude
+                        if dist < 30 then
+                            char.HumanoidRootPart.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(0,0,-20)
+                        end
+                    end
+                end
+            end)
+            repeat task.wait() until not v
+            dodgeCon:Disconnect()
+        end
+    end
+})
+
+-- 🧍 Player Tab
+PlayerTab:CreateToggle({
+    Name = "Infinity Jump",
+    CurrentValue = false,
+    Callback = function(val)
+        _G.infJump = val
+    end
+})
+
+UserInputService.JumpRequest:Connect(function()
+    if _G.infJump and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+    end
+)
+
+-- 🏝️ Islands
+local islandCoords = {
+    ["01"] = { name = "Weather Machine", position = Vector3.new(-1471, -3, 1929) },
+    ["02"] = { name = "Esoteric Depths", position = Vector3.new(3157, -1303, 1439) },
+    ["03"] = { name = "Tropical Grove", position = Vector3.new(-2038, 3, 3650) },
+    ["04"] = { name = "Stingray Shores", position = Vector3.new(-32, 4, 2773) },
+    ["05"] = { name = "Kohana Volcano", position = Vector3.new(-519, 24, 189) },
+    ["06"] = { name = "Coral Reefs", position = Vector3.new(-3095, 1, 2177) },
+    ["07"] = { name = "Crater Island", position = Vector3.new(968, 1, 4854) },
+    ["08"] = { name = "Kohana", position = Vector3.new(-658, 3, 719) },
+    ["09"] = { name = "Winter Fest", position = Vector3.new(1611, 4, 3280) },
+    ["10"] = { name = "Isoteric Island", position = Vector3.new(1987, 4, 1400) },
+    ["11"] = { name = "Lost Isle", position = Vector3.new(-3670, -113, -1128) },
+    ["12"] = { name = "Lost Shore", position = Vector3.new(-3697, 97, -932) },
+    ["13"] = { name = "Sisyphus", position = Vector3.new(-3719, -113, -958) },
+    ["14"] = { name = "Treasure Hall", position = Vector3.new(-3652, -298, -1469) },
+    ["15"] = { name = "Treasure Room", position = Vector3.new(-3652, -283, -1651) }
+}
+
+for _, data in pairs(islandCoords) do
+    IslandsTab:CreateButton({
+        Name = data.name,
+        Callback = function()
+            local char = Workspace.Characters:FindFirstChild(LocalPlayer.Name)
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.CFrame = CFrame.new(data.position + Vector3.new(0, 5, 0))
+            end
+        end
+    })
+end
+
+-- ⚙️ Settings
+SettingsTab:CreateButton({ Name = "Rejoin Server", Callback = function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end })
+SettingsTab:CreateButton({ Name = "Server Hop", Callback = function()
+    local servers = {}
+    local cursor = ""
+    repeat
+        local url = "https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"..(cursor ~= "" and "&cursor="..cursor or "")
+        local success, result = pcall(function()
+            return HttpService:JSONDecode(game:HttpGet(url))
+        end)
+        if success and result and result.data then
+            for _, server in pairs(result.data) do
+                if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                    table.insert(servers, server.id)
+                end
+            end
+            cursor = result.nextPageCursor or ""
+        else
+            break
+        end
+    until not cursor or #servers > 0
+
+    if #servers > 0 then
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], LocalPlayer)
+    end
+end })
+SettingsTab:CreateButton({ Name = "Unload Script", Callback = function()
+    game:GetService("CoreGui").Rayfield:Destroy()
+end })
+
+-- 🧪 Developer Info
+DevTab:CreateParagraph({
+    Title = "HyRexxyy Script",
+    Content = "Thanks for using this script!\n\nDont forget to follow me on my social platform\nDeveloper:\n- Tiktok: tiktok.com/hyrexxyy\n- Instagram: @hyrexxyy\n- GitHub: github.com/hyrexxyy\n\nKeep supporting!"
+})
+
+DevTab:CreateButton({ Name = "Tutor Tiktok", Callback = function() setclipboard("https://tiktok.com/hyrexxyy") Rayfield:Notify({Title="Copied", Content="TikTok link copied!"}) end })
+DevTab:CreateButton({ Name = "Instagram", Callback = function() setclipboard("https://instagram.com/hyrexxyy") Rayfield:Notify({Title="Copied", Content="Instagram link copied!"}) end })
+DevTab:CreateButton({ Name = "GitHub", Callback = function() setclipboard("https://github.com/hyrexxyy") Rayfield:Notify({Title="Copied", Content="GitHub link copied!"}) end })
+
+-- 🎮 Modifiers
+local Modifiers = require(ReplicatedStorage.Shared.FishingRodModifiers)
+for k in pairs(Modifiers) do Modifiers[k] = 999999999 end
+
+local bait = require(ReplicatedStorage.Baits["Luck Bait"])
+bait.Luck = 999999999
+  
